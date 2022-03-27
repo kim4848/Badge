@@ -14,12 +14,12 @@ using Microsoft.OpenApi.Models;
 
 namespace BadgeGenerator
 {
-    public class GetBadge
+    public class BadgeGenerator
     {
-        private readonly ILogger<GetBadge> _logger;
+        private readonly ILogger<BadgeGenerator> _logger;
         private string _personalaccesstoken = "";
 
-        public GetBadge(ILogger<GetBadge> log)
+        public BadgeGenerator(ILogger<BadgeGenerator> log)
         {
             _logger = log;
             _personalaccesstoken = Environment.GetEnvironmentVariable("PAT");
@@ -38,39 +38,17 @@ namespace BadgeGenerator
 
             try
             {
-                using (HttpClient client = new HttpClient())
-                {
-                    client.DefaultRequestHeaders.Accept.Add(
-                        new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/octet-stream"));
+                var codecoverage = await GetCodeCoverageAsync(codeCoverageEndpoint);
 
-                    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic",
-                        Convert.ToBase64String(
-                            System.Text.ASCIIEncoding.ASCII.GetBytes(
-                                string.Format("{0}:{1}", "", _personalaccesstoken))));
+                CoverageStat x = codecoverage.coverageData.First().coverageStats.First(x => x.label == "Lines");
+                double covered = ((double)x.covered / (double)x.total) * 100;
+                var rounded = Math.Round(covered);
+                string color = ResolveBadgeColor(rounded);
 
-                    using (HttpResponseMessage response = await client.GetAsync(codeCoverageEndpoint))
-                    {
-                        response.EnsureSuccessStatusCode();
-                        Root responseBody = await response.Content.ReadAsAsync<Root>();
+                req.HttpContext.Response.Headers.Add("Content-Type", "image/svg+xml; charset=utf-8; api-version=7.1-preview.1");
+                var svgContent = await GetBadge($"https://img.shields.io/badge/Coverage-{rounded}%25-{color}");
+                return new FileContentResult(svgContent, "image/svg+xml; charset=utf-8");
 
-                        CoverageStat x = responseBody.coverageData.First().coverageStats.First(x => x.label == "Lines");
-                        double covered = ((double)x.covered / (double)x.total) * 100;
-                        var rounded = Math.Round(covered);
-                        var color = "red";
-
-                        if (rounded > 30)
-                            color = "yellow";
-                        if (rounded > 70)
-                            color = "green";
-                        req.HttpContext.Response.Headers.Add("Content-Type", "image/svg+xml; charset=utf-8; api-version=7.1-preview.1");
-
-                        using (WebClient client2 = new WebClient())
-                        {
-                            var scgContent = client2.DownloadString($"https://img.shields.io/badge/Coverage-{rounded}%25-{color}");
-                            return new FileContentResult(System.Text.Encoding.UTF8.GetBytes(scgContent), "image/svg+xml; charset=utf-8");
-                        }
-                    }
-                }
             }
             catch (System.Exception ex)
             {
@@ -78,6 +56,57 @@ namespace BadgeGenerator
             }
 
             return new RedirectResult($"https://img.shields.io/badge/Coverage-NA-red");
+        }
+
+        private static string ResolveBadgeColor(double rounded)
+        {
+            var color = "red";
+
+            if (rounded > 30)
+                color = "yellow";
+            if (rounded > 70)
+                color = "green";
+            return color;
+        }
+
+        private async Task<byte[]> GetBadge(string codeCoverageEndpoint)
+        {
+            using (HttpClient client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Accept.Add(
+                    new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/octet-stream"));
+
+                using (HttpResponseMessage response = await client.GetAsync(codeCoverageEndpoint))
+                {
+                    response.EnsureSuccessStatusCode();
+                    var responseBody = await response.Content.ReadAsByteArrayAsync();
+
+                    return responseBody;
+                }
+            }
+        }
+
+
+        private async Task<Root> GetCodeCoverageAsync(string codeCoverageEndpoint)
+        {
+            using (HttpClient client = new HttpClient())
+            {
+                client.DefaultRequestHeaders.Accept.Add(
+                    new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/octet-stream"));
+
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic",
+                    Convert.ToBase64String(
+                        System.Text.ASCIIEncoding.ASCII.GetBytes(
+                            string.Format("{0}:{1}", "", _personalaccesstoken))));
+
+                using (HttpResponseMessage response = await client.GetAsync(codeCoverageEndpoint))
+                {
+                    response.EnsureSuccessStatusCode();
+                    Root responseBody = await response.Content.ReadAsAsync<Root>();
+
+                    return responseBody;
+                }
+            }
         }
     }
 }
