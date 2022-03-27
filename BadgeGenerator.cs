@@ -1,6 +1,5 @@
 using System.Linq;
 using System;
-using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -12,8 +11,6 @@ using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
-using Newtonsoft.Json;
-
 
 namespace BadgeGenerator
 {
@@ -21,7 +18,6 @@ namespace BadgeGenerator
     {
         private readonly ILogger<GetBadge> _logger;
         private string _personalaccesstoken = "";
-
 
         public GetBadge(ILogger<GetBadge> log)
         {
@@ -34,7 +30,7 @@ namespace BadgeGenerator
         [OpenApiParameter(name: "organization", In = ParameterLocation.Path)]
         [OpenApiParameter(name: "project", In = ParameterLocation.Path)]
         [OpenApiParameter(name: "buildId", In = ParameterLocation.Path)]
-        [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "text/plain", bodyType: typeof(string), Description = "The OK response")]
+        [OpenApiResponseWithBody(statusCode: HttpStatusCode.OK, contentType: "image/svg+xml", bodyType: typeof(string), Description = "The OK response")]
         public async Task<IActionResult> Run(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "{organization}/{project}/{buildId}")] HttpRequest req, string organization, string project, string buildId)
         {
@@ -59,8 +55,6 @@ namespace BadgeGenerator
 
                         CoverageStat x = responseBody.coverageData.First().coverageStats.First(x => x.label == "Lines");
                         double covered = ((double)x.covered / (double)x.total) * 100;
-
-
                         var rounded = Math.Round(covered);
                         var color = "red";
 
@@ -75,8 +69,6 @@ namespace BadgeGenerator
                             var scgContent = client2.DownloadString($"https://img.shields.io/badge/Coverage-{rounded}%25-{color}");
                             return new FileContentResult(System.Text.Encoding.UTF8.GetBytes(scgContent), "image/svg+xml; charset=utf-8");
                         }
-
-
                     }
                 }
             }
