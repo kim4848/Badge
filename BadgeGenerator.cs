@@ -23,6 +23,9 @@ namespace BadgeGenerator
         {
             _logger = log;
             _personalaccesstoken = Environment.GetEnvironmentVariable("PAT");
+
+            if (string.IsNullOrWhiteSpace(_personalaccesstoken))
+                throw new Exception("Personal Access Token is missing");
         }
 
         [FunctionName("GetBadge")]
@@ -79,9 +82,7 @@ namespace BadgeGenerator
                 using (HttpResponseMessage response = await client.GetAsync(codeCoverageEndpoint))
                 {
                     response.EnsureSuccessStatusCode();
-                    var responseBody = await response.Content.ReadAsByteArrayAsync();
-
-                    return responseBody;
+                    return await response.Content.ReadAsByteArrayAsync();
                 }
             }
         }
@@ -102,9 +103,7 @@ namespace BadgeGenerator
                 using (HttpResponseMessage response = await client.GetAsync(codeCoverageEndpoint))
                 {
                     response.EnsureSuccessStatusCode();
-                    Root responseBody = await response.Content.ReadAsAsync<Root>();
-
-                    return responseBody;
+                    return await response.Content.ReadAsAsync<Root>();
                 }
             }
         }
